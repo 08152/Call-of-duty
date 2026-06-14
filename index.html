@@ -263,6 +263,31 @@ barriers.push(obj);
 
 }
 
+   function addModel(modelPath, x, y, z, scale=1, sink=0.4){
+
+const loader = new THREE.GLTFLoader();
+
+loader.load(Barrier,(gltf)=>{
+
+const obj = gltf.scene.clone();
+obj.scale.set(scale,scale,scale);
+
+// ground snap
+const ray = new THREE.Raycaster();
+ray.set(new THREE.Vector3(x,100,z), new THREE.Vector3(0,-1,0));
+
+const hit = ray.intersectObject(ground);
+const baseY = hit.length ? hit[0].point.y : 0;
+
+obj.position.set(17.66, baseY - ,56.89);
+
+scene.add(obj);
+barriers.push(obj);
+
+});
+
+}
+
 /* OLD BARRIERS */
 addBarrier(-10,-50,-25,1);
 addBarrier(14,-50,-41,1);
@@ -273,6 +298,7 @@ addBarrier(30.23,0,-61.29,1);
 addBarrier(23.95,0,-42.78,1);
 addBarrier(-21.92,0,-55.83,1);
 addBarrier(-2.21,0,-75.71,1);
+addBarrier(-15.21,0,-75.71,1);
 
 /* =========================
    COLLISION RESOLUTION
