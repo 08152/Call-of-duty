@@ -16,13 +16,11 @@ body { margin:0; overflow:hidden; background:#87cfff; }
   transform:translate(-50%,-50%);
   z-index:10;
 }
-
 #crosshair:before, #crosshair:after{
   content:"";
   position:absolute;
   background:white;
 }
-
 #crosshair:before{ width:2px;height:10px;left:4px;top:0; }
 #crosshair:after{ width:10px;height:2px;left:0;top:4px; }
 
@@ -68,17 +66,16 @@ sun.position.set(10,20,10);
 scene.add(sun);
 
 // ================= GROUND =================
-const texLoader = new THREE.TextureLoader();
-const groundTex = texLoader.load("https://threejs.org/examples/textures/terrain/grasslight-big.jpg");
-
-groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
-groundTex.repeat.set(50,50);
+const tex = new THREE.TextureLoader().load(
+  "https://threejs.org/examples/textures/terrain/grasslight-big.jpg"
+);
+tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+tex.repeat.set(50,50);
 
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(5000,5000),
-  new THREE.MeshStandardMaterial({map:groundTex})
+  new THREE.MeshStandardMaterial({map:tex})
 );
-
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
@@ -92,8 +89,8 @@ camera.position.set(0,2.2,0);
 
 // ================= WEAPON =================
 let weapon;
-
 const loader = new THREE.GLTFLoader();
+
 loader.load("weapon.glb",(gltf)=>{
   weapon = gltf.scene;
   camera.add(weapon);
@@ -136,19 +133,24 @@ document.body.addEventListener("click",()=>{
   document.body.requestPointerLock();
 });
 
-// ================= MOVE =================
+// ================= INPUT =================
 const keys = {};
 window.addEventListener("keydown",(e)=>keys[e.key.toLowerCase()]=true);
 window.addEventListener("keyup",(e)=>keys[e.key.toLowerCase()]=false);
 
-// ================= JUMP + GRAVITY =================
+// ================= GRAVITY + JUMP =================
 let velocityY = 0;
 let onGround = true;
 
-function applyGravity(){
-  const gravity = 0.015;
+window.addEventListener("keydown",(e)=>{
+  if(e.code==="Space" && onGround){
+    velocityY = 0.25;
+    onGround = false;
+  }
+});
 
-  velocityY -= gravity;
+function applyGravity(){
+  velocityY -= 0.015;
   player.position.y += velocityY;
 
   if(player.position.y <= 0){
@@ -158,36 +160,48 @@ function applyGravity(){
   }
 }
 
-window.addEventListener("keydown",(e)=>{
-  if(e.code === "Space" && onGround){
-    velocityY = 0.25;
-    onGround = false;
-  }
-});
-
 // ================= BARRIERS =================
 const gltfLoader = new THREE.GLTFLoader();
 let barriers = [];
 let barrierBoxes = [];
 
 function addBarrier(x,y,z){
-  gltfLoader.load("barrier.glb",(gltf)=>{
-    const b = gltf.scene;
-    b.position.set(x,y,z);
-    scene.add(b);
 
-    barriers.push(b);
+  gltfLoader.load("barrier.glb",(gltf)=>{
+
+    const obj = gltf.scene;
+
+    obj.scale.set(1,1,1);
+
+    // 🔥 Pivot Fix
+    const box = new THREE.Box3().setFromObject(obj);
+    const center = box.getCenter(new THREE.Vector3());
+
+    obj.position.sub(center);
+    obj.position.add(new THREE.Vector3(x,y,z));
+
+    scene.add(obj);
+
+    barriers.push(obj);
     barrierBoxes.push(new THREE.Box3());
   });
 }
 
-addBarrier(0.10,0.00,-50);
-addBarrier(-20.00,0.00,-50);
-addBarrier(-20.00,0.00,-60);
-addBarrier(-15.04,0.00,-37.43);
-addBarrier(8.12,0.00,-38.22);
+// YOUR POSITIONS
+addBarrier(0.10,0,-50);
+addBarrier(-20,0,-50);
+addBarrier(-20,0,-60);
+addBarrier(-15.04,0,-37.43);
+addBarrier(8.12,0,-38.22);
 
-// ================= COLLISION (IMPROVED HITBOX) =================
+// ================= COLLISION (CAPSULE + SLIDING) =================
+function getPlayerBox(pos){
+  return new THREE.Box3().setFromCenterAndSize(
+    new THREE.Vector3(pos.x,pos.y+1.0,pos.z),
+    new THREE.Vector3(0.8,2.0,0.8)
+  );
+}
+
 function move(){
 
   const speed = 0.15;
@@ -204,9 +218,7 @@ function move(){
   forward.y = 0;
   forward.normalize();
 
-  const right = new THREE.Vector3()
-    .crossVectors(forward,new THREE.Vector3(0,1,0))
-    .negate();
+  const right = new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).negate();
 
   const moveVec = new THREE.Vector3();
   moveVec.addScaledVector(forward,dir.z*speed);
@@ -214,25 +226,38 @@ function move(){
 
   const next = player.position.clone().add(moveVec);
 
-  // 🔥 BETTER HITBOX (capsule-like)
-  const playerBox = new THREE.Box3().setFromCenterAndSize(
-    new THREE.Vector3(next.x, next.y + 1.0, next.z),
-    new THREE.Vector3(0.8, 2.0, 0.8)
-  );
+  const playerBox = getPlayerBox(next);
 
-  let blocked = false;
+  let collision = false;
 
   for(let i=0;i<barriers.length;i++){
     barrierBoxes[i].setFromObject(barriers[i]);
 
     if(playerBox.intersectsBox(barrierBoxes[i])){
-      blocked = true;
+      collision = true;
       break;
     }
   }
 
-  if(!blocked){
+  if(!collision){
     player.position.copy(next);
+  } else {
+
+    // SLIDE X
+    const slideX = player.position.clone();
+    slideX.x = next.x;
+
+    // SLIDE Z
+    const slideZ = player.position.clone();
+    slideZ.z = next.z;
+
+    if(!getPlayerBox(slideX).intersectsBox(barrierBoxes[0])){
+      player.position.x = slideX.x;
+    }
+
+    if(!getPlayerBox(slideZ).intersectsBox(barrierBoxes[0])){
+      player.position.z = slideZ.z;
+    }
   }
 }
 
@@ -266,16 +291,13 @@ function animate(){
   move();
   applyGravity();
 
-  // CAMERA
-  const targetCamY = 2.2 + player.position.y;
-  camera.position.y += (targetCamY-camera.position.y)*0.15;
+  const camY = 2.2 + player.position.y;
+  camera.position.y += (camY-camera.position.y)*0.15;
 
-  // WEAPON
   if(weapon){
     weapon.position.lerp(new THREE.Vector3(0.5,-0.9,-1.2),0.15);
   }
 
-  // COORDS
   const dir = new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
 
   document.getElementById("coords").innerHTML =
