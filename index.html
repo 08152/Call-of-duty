@@ -78,10 +78,15 @@ document.body.appendChild(renderer.domElement);
 scene.add(new THREE.AmbientLight(0xffffff,1.2));
 const sun=new THREE.DirectionalLight(0xffffff,1.5);
 sun.position.set(10,20,10);
+sun.intensity = 2.2; // FIX
 scene.add(sun);
 
+scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1.2)); // FIX
+
 // ================= GROUND =================
-const tex=new THREE.TextureLoader().load("https://threejs.org/examples/textures/terrain/grasslight-big.jpg");
+const tex=new THREE.TextureLoader().load(
+  "https://threejs.org/examples/textures/terrain/grasslight-big.jpg"
+);
 tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
 tex.repeat.set(50,50);
 
@@ -142,6 +147,7 @@ function gravity(){
 // ================= MOVE =================
 function move(){
   const speed=0.15;
+
   let dir=new THREE.Vector3();
   if(keys["w"])dir.z-=1;
   if(keys["s"])dir.z+=1;
@@ -159,9 +165,25 @@ function move(){
   player.position.addScaledVector(right,dir.x*speed);
 }
 
-// ================= BARRIERS (GLB + SCALE + HITBOX) =================
+// ================= BARRIERS =================
 const gltfLoader=new THREE.GLTFLoader();
 let barriers=[],barrierBoxes=[];
+
+// 🔧 VISIBILITY FIX FUNCTION
+function fixBarrierVisibility(obj){
+  obj.traverse((child)=>{
+    if(child.isMesh){
+      child.castShadow=true;
+      child.receiveShadow=true;
+
+      if(child.material){
+        child.material.needsUpdate=true;
+        child.material.transparent=false;
+        child.material.opacity=1;
+      }
+    }
+  });
+}
 
 function addBarrier(x,y,z,scale=1){
   gltfLoader.load("barrier.glb",(gltf)=>{
@@ -171,6 +193,8 @@ function addBarrier(x,y,z,scale=1){
     obj.position.set(x,y,z);
 
     scene.add(obj);
+
+    fixBarrierVisibility(obj); // ✅ ADDED
 
     barriers.push(obj);
     barrierBoxes.push(new THREE.Box3());
@@ -327,7 +351,7 @@ function reload(){
   anim();
 }
 
-// ================= INPUT ACTIONS =================
+// ================= INPUT =================
 window.addEventListener("mousedown",(e)=>{
   if(e.button===2)aiming=true;
   if(e.button===0)shoot();
@@ -348,15 +372,12 @@ function animate(){
   moveCollision();
   gravity();
 
-  // camera height
   camera.position.y+=(2.2+player.position.y-camera.position.y)*0.15;
 
-  // ADS zoom
   const targetFov=aiming?aimFov:normalFov;
   camera.fov+=(targetFov-camera.fov)*0.15;
   camera.updateProjectionMatrix();
 
-  // weapon smoothing
   if(weapon){
     weapon.position.lerp(
       aiming?
@@ -366,9 +387,9 @@ function animate(){
     );
   }
 
-  // HUD
-  const dir=new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
+  document.getElementById("healthFill").style.width=health+"%";
 
+  const dir=new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
   document.getElementById("coords").innerHTML=
 `X:${player.position.x.toFixed(2)}
 Y:${player.position.y.toFixed(2)}
@@ -376,8 +397,6 @@ Z:${player.position.z.toFixed(2)}
 
 DIR X:${dir.x.toFixed(2)}
 DIR Z:${dir.z.toFixed(2)}`;
-
-  document.getElementById("healthFill").style.width=health+"%";
 
   renderer.render(scene,camera);
 }
