@@ -2,61 +2,215 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>ULTRA FPS ENGINE v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>ULTRA FPS ENGINE v4</title>
 
 <style>
-body{margin:0;overflow:hidden;background:#87cfff;font-family:Arial}
 
-/* CROSSHAIR */
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+html,
+body{
+width:100%;
+height:100%;
+overflow:hidden;
+background:#87cfff;
+font-family:Arial,Helvetica,sans-serif;
+}
+
+/* =========================
+   THREE CANVAS
+========================= */
+
+canvas{
+display:block;
+}
+
+/* =========================
+   CROSSHAIR
+========================= */
+
 #crosshair{
-position:absolute;top:50%;left:50%;
-width:10px;height:10px;
+position:absolute;
+left:50%;
+top:50%;
+width:16px;
+height:16px;
 transform:translate(-50%,-50%);
-z-index:10;
+pointer-events:none;
+z-index:1000;
 }
-#crosshair:before,#crosshair:after{content:"";position:absolute;background:white}
-#crosshair:before{width:2px;height:10px;left:4px}
-#crosshair:after{width:10px;height:2px;top:4px}
 
-/* UI */
-#coords{
-position:absolute;bottom:10px;right:10px;
-color:white;font-size:13px;
-background:rgba(0,0,0,0.5);
-padding:8px;border-radius:6px;
-white-space:pre;
+#crosshair:before,
+#crosshair:after{
+content:"";
+position:absolute;
+background:white;
 }
+
+#crosshair:before{
+left:7px;
+top:0;
+width:2px;
+height:16px;
+}
+
+#crosshair:after{
+left:0;
+top:7px;
+width:16px;
+height:2px;
+}
+
+/* =========================
+   HEALTH
+========================= */
 
 #healthBar{
-position:absolute;bottom:10px;left:10px;
-width:240px;height:18px;
+position:absolute;
+left:20px;
+bottom:20px;
+
+width:280px;
+height:20px;
+
 border:2px solid white;
 background:rgba(0,0,0,0.3);
+
+z-index:1000;
 }
+
 #healthFill{
 width:100%;
 height:100%;
 background:#1e90ff;
-transition:0.2s;
+transition:.15s;
 }
 
-/* stamina */
+/* =========================
+   STAMINA
+========================= */
+
 #staminaBar{
-position:absolute;bottom:40px;left:10px;
-width:240px;height:10px;
+position:absolute;
+left:20px;
+bottom:50px;
+
+width:280px;
+height:10px;
+
 border:1px solid white;
 background:rgba(0,0,0,0.3);
+
+z-index:1000;
 }
+
 #staminaFill{
-width:100%;height:100%;
+width:100%;
+height:100%;
 background:lime;
 }
 
-/* hitmarker */
+/* =========================
+   AMMO
+========================= */
+
+#ammo{
+position:absolute;
+
+right:20px;
+bottom:20px;
+
+font-size:28px;
+font-weight:bold;
+
+color:white;
+
+background:rgba(0,0,0,.35);
+
+padding:10px 15px;
+border-radius:8px;
+
+z-index:1000;
+}
+
+/* =========================
+   HITMARKER
+========================= */
+
 #hitmarker{
-position:absolute;top:50%;left:50%;
+position:absolute;
+
+left:50%;
+top:50%;
+
 transform:translate(-50%,-50%);
-font-size:40px;color:red;display:none;
+
+font-size:42px;
+font-weight:bold;
+
+color:red;
+
+display:none;
+
+z-index:1200;
+pointer-events:none;
+}
+
+/* =========================
+   DEBUG
+========================= */
+
+#debug{
+position:absolute;
+
+top:10px;
+right:10px;
+
+padding:10px;
+
+background:rgba(0,0,0,.55);
+
+color:#00ff00;
+
+font-size:12px;
+line-height:1.4;
+
+border-radius:6px;
+
+white-space:pre;
+
+z-index:1000;
+}
+
+/* =========================
+   LOADING SCREEN
+========================= */
+
+#loading{
+position:absolute;
+left:0;
+top:0;
+
+width:100%;
+height:100%;
+
+display:flex;
+align-items:center;
+justify-content:center;
+
+background:black;
+color:white;
+
+font-size:30px;
+font-weight:bold;
+
+z-index:9999;
 }
 
 </style>
@@ -64,517 +218,55 @@ font-size:40px;color:red;display:none;
 
 <body>
 
+<!-- Loading -->
+<div id="loading">
+ULTRA FPS ENGINE v4
+</div>
+
+<!-- Crosshair -->
 <div id="crosshair"></div>
-<div id="coords"></div>
-<div id="healthBar"><div id="healthFill"></div></div>
-<div id="staminaBar"><div id="staminaFill"></div></div>
+
+<!-- Hitmarker -->
 <div id="hitmarker">✖</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<!-- Health -->
+<div id="healthBar">
+<div id="healthFill"></div>
+</div>
 
-<script>
+<!-- Stamina -->
+<div id="staminaBar">
+<div id="staminaFill"></div>
+</div>
 
-/* =========================
-   ENGINE CORE
-========================= */
+<!-- Ammo -->
+<div id="ammo">
+30 / 30
+</div>
 
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x87cfff);
+<!-- Debug -->
+<div id="debug">
+Loading...
+</div>
 
-const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,5000);
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
-document.body.appendChild(renderer.domElement);
+<!-- =========================
+     IMPORT MAP
+========================= -->
 
-/* LIGHT SYSTEM */
-const ambient=new THREE.AmbientLight(0xffffff,1.2);
-scene.add(ambient);
-
-const sun=new THREE.DirectionalLight(0xffffff,1.5);
-sun.position.set(10,20,10);
-scene.add(sun);
-
-/* =========================
-   WORLD
-========================= */
-
-const tex=new THREE.TextureLoader().load(
-"https://threejs.org/examples/textures/terrain/grasslight-big.jpg"
-);
-
-tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
-tex.repeat.set(60,60);
-
-const ground=new THREE.Mesh(
-new THREE.PlaneGeometry(5000,5000),
-new THREE.MeshStandardMaterial({map:tex})
-);
-
-ground.rotation.x=-Math.PI/2;
-scene.add(ground);
-
-/* =========================
-   PLAYER SYSTEM
-========================= */
-
-const player=new THREE.Object3D();
-scene.add(player);
-player.add(camera);
-camera.position.set(0,2.2,0);
-
-/* STATES */
-let yaw=0;
-let pitch=0;
-let velY=0;
-let onGround=true;
-
-let health=100;
-let stamina=100;
-
-let aiming=false;
-let reloading=false;
-let sprinting=false;
-let crouching=false;
-
-/* INPUT SYSTEM */
-const keys={};
-
-window.addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
-window.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
-
-/* MOUSE LOOK */
-document.addEventListener("mousemove",(e)=>{
-if(document.pointerLockElement!==document.body)return;
-
-yaw-=e.movementX*0.002;
-pitch-=e.movementY*0.002;
-
-pitch=Math.max(-1.2,Math.min(1.2,pitch));
-
-player.rotation.y=yaw;
-camera.rotation.x=pitch;
-});
-
-document.body.addEventListener("click",()=>document.body.requestPointerLock());
-
-/* =========================
-   MOVEMENT SYSTEM
-========================= */
-
-function getSpeed(){
-let base=0.15;
-
-if(sprinting && stamina>0) base=0.28;
-if(crouching) base=0.07;
-
-return base;
+<script type="importmap">
+{
+  "imports": {
+    "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "gltfloader":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"
+  }
 }
-
-function updateStamina(){
-if(sprinting) stamina-=0.8;
-else stamina+=0.4;
-
-stamina=Math.max(0,Math.min(100,stamina));
-}
-
-/* =========================
-   GRAVITY SYSTEM
-========================= */
-
-function gravity(){
-velY-=0.015;
-player.position.y+=velY;
-
-if(player.position.y<=0){
-player.position.y=0;
-velY=0;
-onGround=true;
-}
-}
-
-/* =========================
-   MOVE SYSTEM
-========================= */
-
-function move(){
-
-const speed=getSpeed();
-
-let dir=new THREE.Vector3();
-
-if(keys["w"])dir.z-=1;
-if(keys["s"])dir.z+=1;
-if(keys["a"])dir.x-=1;
-if(keys["d"])dir.x+=1;
-
-dir.normalize();
-
-const forward=new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
-forward.y=0;forward.normalize();
-
-const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).negate();
-
-player.position.addScaledVector(forward,dir.z*speed);
-player.position.addScaledVector(right,dir.x*speed);
-}
-
-/* =========================
-   COLLISION SYSTEM
-========================= */
-
-function getBox(pos){
-
-return new THREE.Box3().setFromCenterAndSize(
-new THREE.Vector3(pos.x,pos.y+1,pos.z),
-new THREE.Vector3(0.8,2,0.8)
-);
-
-}
-
-/* =========================
-   BARRIERS SYSTEM (GLB)
-========================= */
-
-const loader=new THREE.GLTFLoader();
-let barriers=[];
-
-function addBarrier(x,y,z,scale=1,sink=0.4){
-
-loader.load("barrier.glb",(gltf)=>{
-
-const obj=gltf.scene.clone();
-obj.scale.set(scale,scale,scale);
-
-/* SNAP TO GROUND */
-const ray=new THREE.Raycaster();
-ray.set(new THREE.Vector3(x,100,z),new THREE.Vector3(0,-1,0));
-
-const hit=ray.intersectObject(ground);
-
-const baseY=hit.length?hit[0].point.y:0;
-
-obj.position.set(x,baseY-sink,z);
-
-scene.add(obj);
-barriers.push(obj);
-
-});
-
-}
-
-/* OLD BARRIERS */
-addBarrier(-10,-50,-25,1);
-addBarrier(14,-50,-41,1);
-addBarrier(27,-50,-75,1);
-
-/* NEW COORDS */
-addBarrier(30.23,0,-61.29,1);
-addBarrier(23.95,0,-42.78,1);
-addBarrier(-21.92,0,-55.83,1);
-addBarrier(-2.21,0,-75.71,1);
-
-/* =========================
-   COLLISION RESOLUTION
-========================= */
-
-function moveCollision(){
-
-const speed=getSpeed();
-
-let dir=new THREE.Vector3();
-
-if(keys["w"])dir.z-=1;
-if(keys["s"])dir.z+=1;
-if(keys["a"])dir.x-=1;
-if(keys["d"])dir.x+=1;
-
-dir.normalize();
-
-const forward=new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
-forward.y=0;forward.normalize();
-
-const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).negate();
-
-const move=new THREE.Vector3();
-
-move.addScaledVector(forward,dir.z*speed);
-move.addScaledVector(right,dir.x*speed);
-
-const next=player.position.clone().add(move);
-
-const box=getBox(next);
-
-let blocked=false;
-
-for(const b of barriers){
-
-const meshBox=new THREE.Box3().setFromObject(b);
-
-if(box.intersectsBox(meshBox)){
-blocked=true;
-break;
-}
-
-}
-
-if(!blocked) player.position.copy(next);
-
-}
-
-/* =========================
-   ENEMIES SYSTEM
-========================= */
-
-let enemies=[];
-
-function addEnemy(x,y,z){
-
-const e=new THREE.Mesh(
-new THREE.BoxGeometry(1,2,1),
-new THREE.MeshStandardMaterial({color:0xff0000})
-);
-
-e.position.set(x,y,z);
-e.health=100;
-
-scene.add(e);
-enemies.push(e);
-
-}
-
-addEnemy(5,1,-20);
-addEnemy(-3,1,-15);
-
-/* =========================
-   WEAPON SYSTEM
-========================= */
-
-let weapon;
-
-const shootSound=new Audio("shoot.mp3");
-const reloadSound=new Audio("reload.mp3");
-
-loader.load("weapon.glb",(gltf)=>{
-
-weapon=gltf.scene;
-camera.add(weapon);
-weapon.position.set(0.5,-0.9,-1.2);
-
-});
-
-/* =========================
-   SHOOT SYSTEM
-========================= */
-
-const raycaster=new THREE.Raycaster();
-
-function hitmarker(){
-
-const h=document.getElementById("hitmarker");
-h.style.display="block";
-setTimeout(()=>h.style.display="none",100);
-
-}
-
-function shoot(){
-
-if(reloading)return;
-
-raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
-
-const hits=raycaster.intersectObjects(enemies);
-
-if(hits.length){
-
-const e=hits[0].object;
-
-e.health-=25;
-
-hitmarker();
-
-if(e.health<=0){
-scene.remove(e);
-enemies=enemies.filter(x=>x!==e);
-}
-
-}
-
-shootSound.currentTime=0;
-shootSound.play();
-
-muzzleFlash();
-
-}
-
-function muzzleFlash(){
-
-if(!weapon)return;
-
-const light=new THREE.PointLight(0xffaa00,2,6);
-weapon.add(light);
-light.position.set(0,0,-1);
-
-setTimeout(()=>weapon.remove(light),50);
-
-}
-
-/* =========================
-   RELOAD SYSTEM
-========================= */
-
-function reload(){
-
-if(reloading)return;
-
-reloading=true;
-
-reloadSound.currentTime=0;
-reloadSound.play();
-
-let t=0;
-
-const base=new THREE.Vector3(0.5,-0.9,-1.2);
-const back=new THREE.Vector3(0.2,-0.6,-0.6);
-
-function anim(){
-
-if(t<1){
-weapon.position.lerpVectors(base,back,t);
-t+=0.05;
-requestAnimationFrame(anim);
-}else{
-
-setTimeout(()=>{
-
-let t2=0;
-
-function backAnim(){
-
-if(t2<1){
-weapon.position.lerpVectors(back,base,t2);
-t2+=0.05;
-requestAnimationFrame(backAnim);
-}else reloading=false;
-
-}
-
-backAnim();
-
-},200);
-
-}
-
-}
-
-anim();
-
-}
-
-/* =========================
-   INPUT ACTIONS
-========================= */
-
-window.addEventListener("mousedown",(e)=>{
-if(e.button===2)aiming=true;
-if(e.button===0)shoot();
-});
-
-window.addEventListener("mouseup",(e)=>{
-if(e.button===2)aiming=false;
-});
-
-window.addEventListener("keydown",(e)=>{
-
-if(e.key==="r")reload();
-
-if(e.key==="shift")sprinting=true;
-
-if(e.key==="c")crouching=true;
-
-});
-
-window.addEventListener("keyup",(e)=>{
-
-if(e.key==="shift")sprinting=false;
-if(e.key==="c")crouching=false;
-
-});
-
-/* =========================
-   LOOP
-========================= */
-
-function animate(){
-
-requestAnimationFrame(animate);
-
-moveCollision();
-gravity();
-updateStamina();
-
-camera.position.y+=(2.2+player.position.y-camera.position.y)*0.15;
-
-/* FOV ADS */
-const targetFov=aiming?28:75;
-camera.fov+=(targetFov-camera.fov)*0.15;
-camera.updateProjectionMatrix();
-
-/* WEAPON BOB */
-if(weapon){
-weapon.position.lerp(
-aiming?
-new THREE.Vector3(0,-0.35,-0.45):
-new THREE.Vector3(0.5,-0.9,-1.2),
-0.15
-);
-}
-
-/* UI */
-document.getElementById("healthFill").style.width=health+"%";
-document.getElementById("staminaFill").style.width=stamina+"%";
-
-/* COORDS */
-const dir=new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
-
-document.getElementById("coords").innerHTML=
-`X:${player.position.x.toFixed(2)}
-Y:${player.position.y.toFixed(2)}
-Z:${player.position.z.toFixed(2)}
-
-DIR X:${dir.x.toFixed(2)}
-DIR Z:${dir.z.toFixed(2)}`;
-
-renderer.render(scene,camera);
-
-}
-
-animate();
-
-/* RESIZE */
-window.addEventListener("resize",()=>{
-camera.aspect=innerWidth/innerHeight;
-camera.updateProjectionMatrix();
-renderer.setSize(innerWidth,innerHeight);
-});
-
 </script>
+
+<!-- =========================
+     MAIN ENTRY
+========================= -->
+
+<script type="module" src="./main.js"></script>
+
 </body>
 </html>
-
-<!--
-=========================
-ENGINE SIZE NOTE
-=========================
-This file is intentionally expanded:
-- modular systems
-- extended physics
-- stamina + sprint
-- crouch
-- full barrier system
-- full weapon system
-- enemy system
-- UI system
-
-=> ~600+ lines real engine structure
--->
