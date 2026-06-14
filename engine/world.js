@@ -7,17 +7,15 @@ constructor(scene){
 
 this.scene = scene;
 
-this.loader =
-new GLTFLoader();
+this.loader = new GLTFLoader();
 
 this.barriers = [];
-
 this.ground = null;
 
 }
 
 /* =========================
-   INIT
+   INIT WORLD
 ========================= */
 
 async init(){
@@ -39,52 +37,34 @@ new THREE.TextureLoader().load(
 "https://threejs.org/examples/textures/terrain/grasslight-big.jpg"
 );
 
-tex.wrapS =
-THREE.RepeatWrapping;
-
-tex.wrapT =
-THREE.RepeatWrapping;
-
-tex.repeat.set(
-60,
-60
-);
+tex.wrapS = THREE.RepeatWrapping;
+tex.wrapT = THREE.RepeatWrapping;
+tex.repeat.set(80,80);
 
 this.ground =
 new THREE.Mesh(
 
-new THREE.PlaneGeometry(
-5000,
-5000
-),
+new THREE.PlaneGeometry(5000,5000),
 
 new THREE.MeshStandardMaterial({
-map:tex
+map: tex
 })
 
 );
 
-this.ground.rotation.x =
--Math.PI/2;
+this.ground.rotation.x = -Math.PI/2;
 
-this.ground.receiveShadow =
-true;
+this.ground.receiveShadow = true;
 
-this.scene.add(
-this.ground
-);
+this.scene.add(this.ground);
 
 }
 
 /* =========================
-   LOAD GLB
+   LOAD SINGLE BARRIER
 ========================= */
 
-loadBarrier(
-x,
-z,
-scale=1
-){
+loadBarrier(x,z,scale=1){
 
 return new Promise(resolve=>{
 
@@ -94,27 +74,33 @@ this.loader.load(
 
 gltf=>{
 
-const obj =
-gltf.scene.clone();
+const obj = gltf.scene.clone();
 
-obj.scale.set(
-scale,
-scale,
-scale
+obj.scale.set(scale,scale,scale);
+
+/* snap to ground */
+const ray =
+new THREE.Raycaster();
+
+ray.set(
+new THREE.Vector3(x,100,z),
+new THREE.Vector3(0,-1,0)
 );
 
-obj.position.set(
-x,
-0,
-z
-);
+const hit =
+ray.intersectObject(this.ground);
 
-obj.traverse(mesh=>{
+const y =
+hit.length ? hit[0].point.y : 0;
 
-if(mesh.isMesh){
+obj.position.set(x,y,z);
 
-mesh.castShadow=true;
-mesh.receiveShadow=true;
+obj.traverse(m=>{
+
+if(m.isMesh){
+
+m.castShadow = true;
+m.receiveShadow = true;
 
 }
 
@@ -135,12 +121,12 @@ resolve();
 }
 
 /* =========================
-   MAP
+   MAP DATA (ALL BARRIERS)
 ========================= */
 
 async loadBarriers(){
 
-const data=[
+const data = [
 
 [-10,-25],
 [14,-41],
@@ -170,27 +156,19 @@ b[1],
 }
 
 /* =========================
-   COLLISION
+   COLLISION CHECK
 ========================= */
 
 checkCollision(box){
 
-for(const barrier of this.barriers){
+for(const b of this.barriers){
 
 const meshBox =
 new THREE.Box3()
-.setFromObject(
-barrier
-);
+.setFromObject(b);
 
-if(
-box.intersectsBox(
-meshBox
-)
-){
-
+if(box.intersectsBox(meshBox)){
 return true;
-
 }
 
 }
@@ -200,7 +178,35 @@ return false;
 }
 
 /* =========================
-   DEBUG
+   POINT COLLISION (AI USE)
+========================= */
+
+checkCollisionFromPoint(pos){
+
+const box =
+new THREE.Box3()
+.setFromCenterAndSize(
+
+new THREE.Vector3(
+pos.x,
+pos.y + 1,
+pos.z
+),
+
+new THREE.Vector3(
+0.8,
+2,
+0.8
+)
+
+);
+
+return this.checkCollision(box);
+
+}
+
+/* =========================
+   UTIL
 ========================= */
 
 getBarrierCount(){
