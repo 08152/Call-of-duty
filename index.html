@@ -16,22 +16,29 @@ body { margin:0; overflow:hidden; background:#87cfff; }
   transform:translate(-50%,-50%);
   z-index:10;
 }
+
 #crosshair:before, #crosshair:after{
   content:"";
   position:absolute;
   background:white;
 }
+
 #crosshair:before{ width:2px;height:10px;left:4px;top:0; }
 #crosshair:after{ width:10px;height:2px;left:0;top:4px; }
 
+/* HUD COORDS */
 #coords{
   position:absolute;
   bottom:10px;
   right:10px;
-  color:white;
+  color:#ffffff;
   font-family:Arial;
+  font-size:14px;
   z-index:10;
   text-align:right;
+  background:rgba(0,0,0,0.35);
+  padding:8px 10px;
+  border-radius:6px;
 }
 </style>
 </head>
@@ -72,6 +79,7 @@ const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(5000,5000),
   new THREE.MeshStandardMaterial({map:groundTex})
 );
+
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
@@ -81,6 +89,8 @@ player.position.set(0,0,0);
 scene.add(player);
 
 player.add(camera);
+
+// 🔥 realistische Augenhöhe
 camera.position.set(0,2.2,0);
 
 // ================= WEAPON =================
@@ -90,8 +100,6 @@ const loader = new THREE.GLTFLoader();
 loader.load("weapon.glb",(gltf)=>{
   weapon = gltf.scene;
   camera.add(weapon);
-
-  // 🔥 WAFFE TIEFER IM BILD
   weapon.position.set(0.5,-0.9,-1.2);
 });
 
@@ -198,7 +206,6 @@ function shoot(){
   const dir = raycaster.ray.direction.clone();
 
   raycaster.set(origin,dir);
-
   raycaster.intersectObjects(scene.children,true);
 
   // muzzle flash
@@ -265,16 +272,16 @@ function animate(){
 
   move();
 
-  // CAMERA
+  // CAMERA HEIGHT
   const targetCamY = aiming ? 2.8 : 2.2;
   camera.position.y += (targetCamY-camera.position.y)*0.15;
 
-  // ZOOM
+  // FOV ZOOM
   const targetFov = aiming ? aimFov : normalFov;
   camera.fov += (targetFov-camera.fov)*0.12;
   camera.updateProjectionMatrix();
 
-  // WEAPON ADS (lowered)
+  // WEAPON ADS
   if(weapon && !reloading){
     if(aiming){
       weapon.position.lerp(new THREE.Vector3(0,-0.35,-0.45),0.2);
@@ -283,11 +290,15 @@ function animate(){
     }
   }
 
-  // coords
+  // ================= COORDS + DIRECTION =================
+  const dir = new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
+
   document.getElementById("coords").innerHTML =
-  `X:${player.position.x.toFixed(2)}<br>
-   Y:${player.position.y.toFixed(2)}<br>
-   Z:${player.position.z.toFixed(2)}`;
+  `X: ${player.position.x.toFixed(2)}<br>
+   Y: ${player.position.y.toFixed(2)}<br>
+   Z: ${player.position.z.toFixed(2)}<br><br>
+   DIR X: ${dir.x.toFixed(2)}<br>
+   DIR Z: ${dir.z.toFixed(2)}`;
 
   renderer.render(scene,camera);
 }
