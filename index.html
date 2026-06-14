@@ -273,7 +273,7 @@ function animate(){
 
   // ================= CAMERA HEIGHT =================
   const normalCamY = 2.2;
-  const aimCamY = 4.8; // 🔥 much higher when aiming
+  const aimCamY = 2.8; // 🔥 much higher when aiming
 
   const targetCamY = aiming ? aimCamY : normalCamY;
   camera.position.y += (targetCamY-camera.position.y)*0.15;
@@ -286,7 +286,7 @@ function animate(){
   // ================= WEAPON ADS =================
   if(weapon && !reloading){
     if(aiming){
-      weapon.position.lerp(new THREE.Vector3(0,-0.15,-0.45),0.2);
+      weapon.position.lerp(new THREE.Vector3(0,-0.15,1.45),0.2);
     } else {
       weapon.position.lerp(new THREE.Vector3(0.5,-0.5,-1.2),0.15);
     }
