@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>FPS Shooter Collision</title>
+<title>FPS Shooter</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#87cfff; }
@@ -16,25 +16,29 @@ body { margin:0; overflow:hidden; background:#87cfff; }
   transform:translate(-50%,-50%);
   z-index:10;
 }
+
 #crosshair:before, #crosshair:after{
   content:"";
   position:absolute;
   background:white;
 }
+
 #crosshair:before{ width:2px;height:10px;left:4px;top:0; }
 #crosshair:after{ width:10px;height:2px;left:0;top:4px; }
 
+/* HUD COORDS */
 #coords{
   position:absolute;
   bottom:10px;
   right:10px;
-  color:white;
+  color:#ffffff;
   font-family:Arial;
-  font-size:13px;
-  background:rgba(0,0,0,0.35);
-  padding:8px;
-  border-radius:6px;
+  font-size:14px;
   z-index:10;
+  text-align:right;
+  background:rgba(0,0,0,0.35);
+  padding:8px 10px;
+  border-radius:6px;
 }
 </style>
 </head>
@@ -75,6 +79,7 @@ const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(5000,5000),
   new THREE.MeshStandardMaterial({map:groundTex})
 );
+
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
@@ -88,8 +93,8 @@ camera.position.set(0,2.2,0);
 
 // ================= WEAPON =================
 let weapon;
-const loader = new THREE.GLTFLoader();
 
+const loader = new THREE.GLTFLoader();
 loader.load("weapon.glb",(gltf)=>{
   weapon = gltf.scene;
   camera.add(weapon);
@@ -104,7 +109,6 @@ function playShoot(){
   shootSound.pause();
   shootSound.currentTime = 0;
   shootSound.play();
-
   setTimeout(()=>shootSound.pause(),250);
 }
 
@@ -113,14 +117,15 @@ function playReload(){
   reloadSound.play();
 }
 
-// ================= CONTROLS =================
-let yaw=0, pitch=0;
+// ================= LOOK =================
+let yaw = 0;
+let pitch = 0;
 
 document.addEventListener("mousemove",(e)=>{
-  if(document.pointerLockElement!==document.body) return;
+  if(document.pointerLockElement !== document.body) return;
 
-  yaw -= e.movementX*0.002;
-  pitch -= e.movementY*0.002;
+  yaw -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
 
   pitch = Math.max(-1.2,Math.min(1.2,pitch));
 
@@ -132,12 +137,12 @@ document.body.addEventListener("click",()=>{
   document.body.requestPointerLock();
 });
 
-// ================= INPUT =================
-const keys={};
-window.addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
-window.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+// ================= MOVE =================
+const keys = {};
+window.addEventListener("keydown",(e)=>keys[e.key.toLowerCase()]=true);
+window.addEventListener("keyup",(e)=>keys[e.key.toLowerCase()]=false);
 
-// ================= BARRIERS =================
+// ================= COLLISION SYSTEM =================
 const gltfLoader = new THREE.GLTFLoader();
 let barriers = [];
 let barrierBoxes = [];
@@ -160,7 +165,7 @@ addBarrier(-20.00, 0.00, -60.00);
 addBarrier(-15.04, 0.00, -37.43);
 addBarrier(8.12, 0.00, -38.22);
 
-// ================= MOVE + COLLISION =================
+// ================= MOVE WITH COLLISION =================
 function move(){
 
   const speed = 0.15;
@@ -174,36 +179,39 @@ function move(){
   dir.normalize();
 
   const forward = new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
-  forward.y=0; forward.normalize();
+  forward.y = 0;
+  forward.normalize();
 
-  const right = new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).negate();
+  const right = new THREE.Vector3()
+    .crossVectors(forward,new THREE.Vector3(0,1,0))
+    .negate();
 
   const moveVec = new THREE.Vector3();
   moveVec.addScaledVector(forward,dir.z*speed);
   moveVec.addScaledVector(right,dir.x*speed);
 
-  const next = player.position.clone().add(moveVec);
+  const nextPos = player.position.clone().add(moveVec);
 
   // PLAYER BOX
   const playerBox = new THREE.Box3().setFromCenterAndSize(
-    new THREE.Vector3(next.x,next.y,next.z),
+    new THREE.Vector3(nextPos.x,nextPos.y,nextPos.z),
     new THREE.Vector3(1,2,1)
   );
 
-  let blocked=false;
+  let blocked = false;
 
   for(let i=0;i<barriers.length;i++){
 
     barrierBoxes[i].setFromObject(barriers[i]);
 
     if(playerBox.intersectsBox(barrierBoxes[i])){
-      blocked=true;
+      blocked = true;
       break;
     }
   }
 
   if(!blocked){
-    player.position.copy(next);
+    player.position.copy(nextPos);
   }
 }
 
@@ -216,13 +224,10 @@ function shoot(){
   raycaster.setFromCamera(mouse,camera);
 
   const origin = camera.getWorldPosition(new THREE.Vector3());
-  const dir = raycaster.ray.direction.clone();
-
-  raycaster.set(origin,dir);
+  raycaster.set(origin, raycaster.ray.direction);
 
   raycaster.intersectObjects(scene.children,true);
 
-  // muzzle flash
   if(weapon){
     const light = new THREE.PointLight(0xffaa00,2,5);
     weapon.add(light);
