@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>FPS Shooter</title>
+
+<style>
+body { margin:0; overflow:hidden; background:#87cfff; }
+
+/* CROSSHAIR */
+#crosshair{
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:10px;
+  height:10px;
+  transform:translate(-50%,-50%);
+  z-index:10;
+}
+#crosshair:before, #crosshair:after{
+  content:"";
+  position:absolute;
+  background:white;
+}
+#crosshair:before{
+  width:2px;height:10px;left:4px;top:0;
+}
+#crosshair:after{
+  width:10px;height:2px;left:0;top:4px;
+}
+
+#info{
+  position:absolute;
+  top:10px;left:10px;
+  color:white;
+  font-family:Arial;
+  z-index:10;
+}
+</style>
+</head>
+
+<body>
+
+<div id="crosshair"></div>
+<div id="info">Click = Lock | Hold Click = Shoot</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<script>
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87cfff);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 5000);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// LIGHT
+scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(10,20,10);
+scene.add(sun);
+
+// ================= GROUND (DIRT/GRASS TEXTURE) =================
+const texLoader = new THREE.TextureLoader();
+const groundTex = texLoader.load("https://threejs.org/examples/textures/terrain/grasslight-big.jpg");
+
+groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+groundTex.repeat.set(50,50);
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(5000,5000),
+  new THREE.MeshStandardMaterial({map:groundTex})
+);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
+
+// ================= PLAYER =================
+const player = new THREE.Object3D();
+player.position.set(0,1.6,0);
+scene.add(player);
+player.add(camera);
+
+// ================= WEAPON (GLB) =================
+let weapon;
+
+const loader = new THREE.GLTFLoader();
+loader.load("weapon.glb",(gltf)=>{
+  weapon = gltf.scene;
+  camera.add(weapon);
+
+  weapon.position.set(0.5,-0.5,-1.2);
+  weapon.scale.set(0.8,0.8,0.8);
+});
+
+// ================= MOUSE LOOK =================
+let yaw = 0;
+let pitch = 0;
+
+document.addEventListener("mousemove",(e)=>{
+  if(document.pointerLockElement !== document.body) return;
+
+  yaw -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
+
+  pitch = Math.max(-1.2, Math.min(1.2, pitch));
+
+  player.rotation.y = yaw;
+  camera.rotation.x = pitch;
+});
+
+document.body.addEventListener("click",()=>{
+  document.body.requestPointerLock();
+});
+
+// ================= MOVEMENT =================
+const keys = {};
+
+window.addEventListener("keydown",(e)=>keys[e.key.toLowerCase()]=true);
+window.addEventListener("keyup",(e)=>keys[e.key.toLowerCase()]=false);
+
+function move(){
+  const speed = 0.15;
+
+  const dir = new THREE.Vector3();
+  if(keys["w"]) dir.z -= 1;
+  if(keys["s"]) dir.z += 1;
+  if(keys["a"]) dir.x -= 1;
+  if(keys["d"]) dir.x += 1;
+
+  dir.normalize();
+
+  const forward = new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
+  forward.y = 0; forward.normalize();
+
+  const right = new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).negate();
+
+  player.position.addScaledVector(forward, dir.z * speed);
+  player.position.addScaledVector(right, dir.x * speed);
+}
+
+// ================= SHOOTING =================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(0,0);
+
+let shooting = false;
+let lastShot = 0;
+
+const bulletHoles = [];
+
+const bulletTex = texLoader.load("loch.png");
+
+function shoot(){
+
+  // ray from center
+  raycaster.setFromCamera(mouse, camera);
+
+  const dir = raycaster.ray.direction.clone();
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+
+  raycaster.set(origin, dir);
+
+  const hit = raycaster.intersectObjects(scene.children,true);
+
+  if(hit.length > 0){
+
+    const p = hit[0].point;
+
+    const hole = new THREE.Sprite(new THREE.SpriteMaterial({map:bulletTex}));
+    hole.position.copy(p);
+    hole.scale.set(0.3,0.3,0.3);
+
+    scene.add(hole);
+
+    bulletHoles.push({obj:hole,time:performance.now()});
+  }
+
+  // MUZZLE FLASH
+  if(weapon){
+    const flash = new THREE.PointLight(0xffaa00,2,5);
+    weapon.add(flash);
+    flash.position.set(0,0,-1);
+
+    setTimeout(()=>weapon.remove(flash),50);
+  }
+}
+
+window.addEventListener("mousedown",()=>shooting=true);
+window.addEventListener("mouseup",()=>shooting=false);
+
+// ================= LOOP =================
+function animate(){
+  requestAnimationFrame(animate);
+
+  move();
+
+  // AUTO FIRE 10 shots/sec
+  if(shooting){
+    const now = performance.now();
+    if(now - lastShot > 100){
+      shoot();
+      lastShot = now;
+    }
+  }
+
+  // REMOVE BULLET HOLES AFTER 10 SEC
+  for(let i=bulletHoles.length-1;i>=0;i--){
+    if(performance.now() - bulletHoles[i].time > 10000){
+      scene.remove(bulletHoles[i].obj);
+      bulletHoles.splice(i,1);
+    }
+  }
+
+  renderer.render(scene,camera);
+}
+
+animate();
+
+// RESIZE
+window.addEventListener("resize",()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+</script>
+
+</body>
+</html>
