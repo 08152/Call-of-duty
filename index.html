@@ -34,6 +34,7 @@ body { margin:0; overflow:hidden; background:#87cfff; }
   font-family:Arial;
   font-size:14px;
   z-index:10;
+  text-align:right;
   background:rgba(0,0,0,0.35);
   padding:8px;
   border-radius:6px;
@@ -67,66 +68,53 @@ sun.position.set(10,20,10);
 scene.add(sun);
 
 // ================= GROUND =================
+const texLoader = new THREE.TextureLoader();
+const groundTex = texLoader.load("https://threejs.org/examples/textures/terrain/grasslight-big.jpg");
+
+groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+groundTex.repeat.set(50,50);
+
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(500,500),
-  new THREE.MeshStandardMaterial({color:0x3fa34d})
+  new THREE.PlaneGeometry(5000,5000),
+  new THREE.MeshStandardMaterial({map:groundTex})
 );
+
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
 // ================= PLAYER =================
 const player = new THREE.Object3D();
-player.position.set(0,2,5);
+player.position.set(0,0,0);
 scene.add(player);
 
 player.add(camera);
 camera.position.set(0,2.2,0);
 
-// ================= PHYSICS =================
-let velocityY = 0;
-const gravity = -0.02;
-let canJump = false;
+// ================= WEAPON =================
+let weapon;
 
-// ================= BARRIERS =================
-const barriers = [];
-const barrierBoxes = [];
+const loader = new THREE.GLTFLoader();
+loader.load("weapon.glb",(gltf)=>{
+  weapon = gltf.scene;
+  camera.add(weapon);
+  weapon.position.set(0.5,-0.9,-1.2);
+});
 
-function createBarrier(x,z){
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(2,2,2),
-    new THREE.MeshStandardMaterial({color:0x555555})
-  );
+// ================= SOUND =================
+const shootSound = new Audio("shoot.mp3");
+const reloadSound = new Audio("reload.mp3");
 
-  // 🔥 tiefer in Boden setzen
-  mesh.position.set(x,0.5,z);
-  scene.add(mesh);
-
-  barriers.push(mesh);
-
-  const box = new THREE.Box3().setFromObject(mesh);
-  barrierBoxes.push(box);
+function playShoot(){
+  shootSound.pause();
+  shootSound.currentTime = 0;
+  shootSound.play();
+  setTimeout(()=>shootSound.pause(),250);
 }
 
-createBarrier(5,0);
-createBarrier(-5,0);
-createBarrier(0,-8);
-
-// ================= INPUT =================
-const keys = {};
-
-window.addEventListener("keydown",(e)=>{
-  keys[e.key.toLowerCase()] = true;
-
-  // JUMP
-  if(e.code === "Space" && canJump){
-    velocityY = 0.25;
-    canJump = false;
-  }
-});
-
-window.addEventListener("keyup",(e)=>{
-  keys[e.key.toLowerCase()] = false;
-});
+function playReload(){
+  reloadSound.currentTime = 0;
+  reloadSound.play();
+}
 
 // ================= LOOK =================
 let yaw = 0;
@@ -148,13 +136,42 @@ document.body.addEventListener("click",()=>{
   document.body.requestPointerLock();
 });
 
-// ================= MOVE + COLLISION =================
-function move(){
+// ================= MOVE =================
+const keys = {};
+window.addEventListener("keydown",(e)=>keys[e.key.toLowerCase()]=true);
+window.addEventListener("keyup",(e)=>keys[e.key.toLowerCase()]=false);
 
-  const speed = 0.12;
+// ================= 🆕 PHYSICS (ADDED, NOTHING REMOVED) =================
+let velocityY = 0;
+const gravity = -0.02;
+let canJump = false;
+
+// ================= 🆕 BARRIERS =================
+const barriers = [];
+const barrierBoxes = [];
+
+function createBarrier(x,z){
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(2,2,2),
+    new THREE.MeshStandardMaterial({color:0x444444})
+  );
+
+  mesh.position.set(x,0.5,z); // leicht im Boden
+  scene.add(mesh);
+
+  barriers.push(mesh);
+  barrierBoxes.push(new THREE.Box3().setFromObject(mesh));
+}
+
+createBarrier(5,0);
+createBarrier(-5,0);
+createBarrier(0,-8);
+
+// ================= MOVE =================
+function move(){
+  const speed = 0.15;
 
   const dir = new THREE.Vector3();
-
   if(keys["w"]) dir.z -= 1;
   if(keys["s"]) dir.z += 1;
   if(keys["a"]) dir.x -= 1;
@@ -169,18 +186,15 @@ function move(){
   const right = new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).negate();
 
   let nextPos = player.position.clone();
-
   nextPos.addScaledVector(forward,dir.z*speed);
   nextPos.addScaledVector(right,dir.x*speed);
 
-  // 🔥 collision check
   const testBox = new THREE.Box3().setFromCenterAndSize(
     nextPos.clone().add(new THREE.Vector3(0,1,0)),
     new THREE.Vector3(1,2,1)
   );
 
   let blocked = false;
-
   for(const box of barrierBoxes){
     if(testBox.intersectsBox(box)){
       blocked = true;
@@ -193,6 +207,100 @@ function move(){
   }
 }
 
+// ================= JUMP (ADDED, NOTHING REMOVED) =================
+window.addEventListener("keydown",(e)=>{
+  if(e.code === "Space" && canJump){
+    velocityY = 0.25;
+    canJump = false;
+  }
+
+  if(e.key.toLowerCase()==="r") reload();
+});
+
+// ================= AIM + SHOOT =================
+let aiming = false;
+let canShoot = true;
+let reloading = false;
+
+window.addEventListener("contextmenu",e=>e.preventDefault());
+
+window.addEventListener("mousedown",(e)=>{
+  if(e.button === 2) aiming = true;
+
+  if(e.button === 0 && canShoot && !reloading){
+    shoot();
+    canShoot = false;
+    setTimeout(()=>canShoot=true, 200);
+  }
+});
+
+window.addEventListener("mouseup",(e)=>{
+  if(e.button === 2) aiming = false;
+});
+
+// ================= SHOOT =================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(0,0);
+
+function shoot(){
+  raycaster.setFromCamera(mouse,camera);
+
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  raycaster.set(origin, raycaster.ray.direction);
+
+  raycaster.intersectObjects(scene.children,true);
+
+  if(weapon){
+    const light = new THREE.PointLight(0xffaa00,2,5);
+    weapon.add(light);
+    light.position.set(0,0,-1);
+    setTimeout(()=>weapon.remove(light),50);
+  }
+
+  playShoot();
+}
+
+// ================= RELOAD =================
+function reload(){
+  if(reloading) return;
+  reloading = true;
+
+  playReload();
+
+  const base = new THREE.Vector3(0.5,-0.9,-1.2);
+  const back = new THREE.Vector3(0.2,-0.6,-0.6);
+
+  let t=0;
+
+  function animBack(){
+    if(!weapon) return;
+
+    if(t<1){
+      weapon.position.lerpVectors(base,back,t);
+      t+=0.05;
+      requestAnimationFrame(animBack);
+    } else {
+      setTimeout(()=>{
+        let t2=0;
+
+        function animFront(){
+          if(t2<1){
+            weapon.position.lerpVectors(back,base,t2);
+            t2+=0.05;
+            requestAnimationFrame(animFront);
+          } else {
+            reloading=false;
+          }
+        }
+
+        animFront();
+      },300);
+    }
+  }
+
+  animBack();
+}
+
 // ================= LOOP =================
 function animate(){
   requestAnimationFrame(animate);
@@ -203,7 +311,6 @@ function animate(){
   velocityY += gravity;
   player.position.y += velocityY;
 
-  // FLOOR
   if(player.position.y < 2){
     player.position.y = 2;
     velocityY = 0;
@@ -213,6 +320,17 @@ function animate(){
   // update hitboxes
   for(let i=0;i<barriers.length;i++){
     barrierBoxes[i].setFromObject(barriers[i]);
+  }
+
+  const targetCamY = aiming ? 2.6 : 2.2;
+  camera.position.y += (targetCamY-camera.position.y)*0.15;
+
+  if(weapon && !reloading){
+    if(aiming){
+      weapon.position.lerp(new THREE.Vector3(0,-0.35,-0.45),0.2);
+    } else {
+      weapon.position.lerp(new THREE.Vector3(0.5,-0.9,-1.2),0.15);
+    }
   }
 
   document.getElementById("coords").innerHTML =
