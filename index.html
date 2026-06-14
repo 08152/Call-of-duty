@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>FPS Shooter Clean</title>
+<title>FPS Shooter</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#87cfff; }
@@ -75,14 +75,12 @@ const ground = new THREE.Mesh(
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// ================= PLAYER (HIGHER) =================
+// ================= PLAYER =================
 const player = new THREE.Object3D();
 player.position.set(0,0,0);
 scene.add(player);
 
 player.add(camera);
-
-// 🔥 MUCH HIGHER CAMERA (real FPS height)
 camera.position.set(0,2.2,0);
 
 // ================= WEAPON =================
@@ -92,21 +90,20 @@ const loader = new THREE.GLTFLoader();
 loader.load("weapon.glb",(gltf)=>{
   weapon = gltf.scene;
   camera.add(weapon);
-  weapon.position.set(0.5,-0.5,-1.2);
+
+  // 🔥 WAFFE TIEFER IM BILD
+  weapon.position.set(0.5,-0.9,-1.2);
 });
 
 // ================= FOV =================
 const normalFov = 75;
-const aimFov = 28; // 🔥 stronger zoom
+const aimFov = 28;
 camera.fov = normalFov;
 camera.updateProjectionMatrix();
 
 // ================= SOUND =================
 const shootSound = new Audio("shoot.mp3");
 const reloadSound = new Audio("reload.mp3");
-
-shootSound.volume = 0.5;
-reloadSound.volume = 0.6;
 
 function playShoot(){
   shootSound.pause();
@@ -168,7 +165,7 @@ function move(){
   player.position.addScaledVector(right,dir.x*speed);
 }
 
-// ================= AIM / SHOOT (SINGLE SHOT ONLY) =================
+// ================= AIM / SHOOT =================
 let aiming = false;
 let canShoot = true;
 let reloading = false;
@@ -178,12 +175,10 @@ window.addEventListener("contextmenu",e=>e.preventDefault());
 window.addEventListener("mousedown",(e)=>{
   if(e.button===2) aiming=true;
 
-  // 🔫 single shot only
   if(e.button===0 && canShoot && !reloading){
     shoot();
     canShoot = false;
-
-    setTimeout(()=>canShoot=true, 200); // slight fire delay
+    setTimeout(()=>canShoot=true,200);
   }
 });
 
@@ -204,7 +199,6 @@ function shoot(){
 
   raycaster.set(origin,dir);
 
-  // no bullet holes anymore → only hit detection optional
   raycaster.intersectObjects(scene.children,true);
 
   // muzzle flash
@@ -225,8 +219,8 @@ function reload(){
 
   playReload();
 
-  const base = new THREE.Vector3(0.5,-0.5,-1.2);
-  const back = new THREE.Vector3(0.2,-0.3,-0.6);
+  const base = new THREE.Vector3(0.5,-0.9,-1.2);
+  const back = new THREE.Vector3(0.2,-0.6,-0.6);
 
   let t=0;
 
@@ -271,24 +265,21 @@ function animate(){
 
   move();
 
-  // ================= CAMERA HEIGHT =================
-  const normalCamY = 2.2;
-  const aimCamY = 2.8; // 🔥 much higher when aiming
-
-  const targetCamY = aiming ? aimCamY : normalCamY;
+  // CAMERA
+  const targetCamY = aiming ? 2.8 : 2.2;
   camera.position.y += (targetCamY-camera.position.y)*0.15;
 
-  // ================= ZOOM =================
+  // ZOOM
   const targetFov = aiming ? aimFov : normalFov;
   camera.fov += (targetFov-camera.fov)*0.12;
   camera.updateProjectionMatrix();
 
-  // ================= WEAPON ADS =================
+  // WEAPON ADS (lowered)
   if(weapon && !reloading){
     if(aiming){
-      weapon.position.lerp(new THREE.Vector3(0,-0.15,-0.45),0.2);
+      weapon.position.lerp(new THREE.Vector3(0,-0.35,-0.45),0.2);
     } else {
-      weapon.position.lerp(new THREE.Vector3(0.5,-0.5,-1.2),0.15);
+      weapon.position.lerp(new THREE.Vector3(0.5,-0.9,-1.2),0.15);
     }
   }
 
